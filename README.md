@@ -8,6 +8,12 @@ electricity theft. The detector is deterministic and fully offline; an optional
 learned model sits on top as a second opinion, and the whole thing is evaluated
 honestly on meters it has never seen.
 
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue)](.github/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+---
+
 ## Why it matters
 
 Grid operators drown in meter data and cannot eyeball it. The useful question is
