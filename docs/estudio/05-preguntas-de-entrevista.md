@@ -6,8 +6,9 @@ Preguntas típicas sobre este proyecto y cómo responderlas.
 Porque un analista que recibe una alerta necesita saber **por qué** ha saltado:
 "el contador estuvo a cero 14 horas" es accionable; "el modelo dio 0,87" no. Las
 reglas deterministas dan hallazgos explicables y auditables, y el modelo queda
-como **segunda opinión** que solo amplía la red global. Separar las dos
-responsabilidades hace el sistema defendible ante una cuadrilla de campo.
+como **suplemento de recall con compuerta de confianza** que solo amplía la red
+global cuando está seguro. Separar las dos responsabilidades hace el sistema
+defendible ante una cuadrilla de campo.
 
 ### "¿Por qué comparas cada contador consigo mismo y no con un umbral global?"
 Porque el consumo es heterogéneo: una casa grande gasta diez veces más que un
@@ -23,19 +24,26 @@ insensibles a unos pocos extremos, así que la anomalía sobresale en lugar de
 camuflarse. La constante 0,6745 escala la MAD para que coincida con el z ordinario
 en datos normales.
 
-### "Tu detector de robo tiene un recall de solo ~0,46. ¿No es malo?"
-Es **honesto**. El robo sutil (un bajón sostenido al ~70%) es casi indistinguible
-de un uso bajo legítimo; de hecho inyecto **vacaciones** etiquetadas como normales
-para medirlo contra ese confusor. La regla caza los casos flagrantes (bajones
-profundos, lecturas negativas/puenteadas) y se deja los sutiles, y el número lo
-dice en vez de esconderlo en un titular global. El modelo sube el recall global a
-0,93 a costa de precisión; ese compromiso lo decide el operador.
+### "El robo parece el caso difícil, ¿cómo lo distingues de un uso bajo legítimo?"
+Por la **forma**. Un contador manipulado sub-registra una casa **habitada**: la
+carga sigue su perfil diario (picos de mañana y tarde), solo que escalado. Una
+**vacación** es una casa **vacía**: se aplana a un *standby* sin picos. Así que la
+regla de robo exige dos cosas sobre el bajón sostenido: que el cociente
+`lectura/base` **suavizado** caiga bajo el umbral, y que la ventana **conserve la
+forma** (correlación con el perfil ≥ 0,5). La vacación, al aplanarse, tiene
+correlación ~0 y no se marca. Resultado medido: robo precisión ~0,99, recall ~0,81,
+F1 ~0,89 — en la liga de picos y apagones. Tratar robo y vacación como "el mismo
+bajón" es justo el error que evita la prueba de forma. (Suavizar el cociente es lo
+que recupera el robo de fracción alta, ~0,70,
+cuyas horas ruidosas un umbral por hora dejaba escapar.)
 
 ### "¿Cómo garantizas que la evaluación no se engaña a sí misma?"
 Reteniendo **contadores enteros** (test nunca visto en train), puntuando **hora a
-hora** (un apagón tardío pierde recall), reportando **por tipo** (picos y apagones
-~0,95 F1; robo ~0,53) y **promediando varias semillas**. Y dejo vacaciones reales
-dentro de los datos para no medir contra un espantapájaros.
+hora** (un apagón tardío pierde recall), reportando **por tipo** (picos ~0,95,
+apagones ~0,96, robo ~0,89 F1) y **promediando varias semillas**. Y dejo
+vacaciones reales dentro de los datos para que la evaluación demuestre que la
+separación robo-vs-vacación aguanta sobre contadores no vistos, no contra un
+espantapájaros.
 
 ### "¿Por qué las características son invariantes a la escala?"
 Porque el modelo se entrena con unas casas y se aplica a otras **no vistas**. Si

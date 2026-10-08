@@ -48,9 +48,11 @@ Generamos los datos nosotros (`generate.py`), lo que nos da dos cosas:
 
 1. **Etiquetas verdaderas:** sabemos exactamente qué horas son anómalas y de qué
    tipo, así que podemos medir precisión y exhaustividad de verdad.
-2. **Trampas a propósito:** inyectamos también **vacaciones** legítimas (un bajón
-   sostenido de consumo etiquetado como *normal*), porque físicamente son casi
-   idénticas a un robo parcial. Dejarlas dentro impide que la evaluación se
-   engañe a sí misma (ver 04).
+2. **Confusor a propósito:** inyectamos también **vacaciones** legítimas
+   (etiquetadas *normal*). Una vacación es una casa **vacía**: el consumo se aplana
+   a un nivel de *standby* sin picos diarios, a diferencia del robo, que **escala**
+   el perfil pero conserva su forma. Dejarlas dentro obliga al detector a
+   distinguir *forma aplanada* de *forma conservada*, en vez de marcar todo bajón
+   como robo (ver 03 y 04).
 
 Todo es offline y determinista: misma semilla, mismos datos.

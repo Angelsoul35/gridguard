@@ -11,8 +11,11 @@ the rule, the offending value, the house's own baseline, and a score:
   is a **robust z** (median + MAD); the ordinary mean + std would let a big spike
   inflate its own spread and hide (see ``docs/adr/0004``).
 * **theft / tampering** — readings held below ``theft_fraction`` of the expected
-  baseline for at least ``theft_min_run`` hours (a sustained non-technical loss),
-  or negative / near-zero "bypassed" readings.
+  baseline for at least ``theft_min_run`` hours **while still following the house's
+  daily shape** (correlation with the baseline at least ``theft_shape_corr_min``),
+  the signature of an occupied house whose meter under-records; or negative /
+  near-zero "bypassed" readings. The shape test is what separates theft from a
+  legitimate empty-house vacation, which collapses to a flat standby load.
 
 On top of the rules an **optional** scikit-learn model (``logistic`` by default,
 or ``isolation_forest``, or ``none``) scores each hour from the full feature
@@ -34,7 +37,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from .config import Settings, get_settings
-from .features import FeatureBundle, compute_features
+from .features import FeatureBundle, compute_features, window_shape_corr
 from .generate import NORMAL, OUTAGE, SPIKE, THEFT, House
 
 
@@ -77,6 +80,20 @@ def _runs_of(mask: np.ndarray) -> list[tuple[int, int]]:
         else:
             i += 1
     return runs
+
+
+def _rolling_mean(x: np.ndarray, k: int) -> np.ndarray:
+    """Centered rolling mean of length ``k`` with shrinking windows at the edges."""
+    x = np.asarray(x, dtype=float)
+    n = x.shape[0]
+    if k <= 1 or n == 0:
+        return x
+    half = k // 2
+    csum = np.concatenate([[0.0], np.cumsum(x)])
+    idx = np.arange(n)
+    lo = np.maximum(0, idx - half)
+    hi = np.minimum(n, idx + half + 1)
+    return (csum[hi] - csum[lo]) / (hi - lo)
 
 
 def _constant_runs(readings: np.ndarray, tol: float) -> list[tuple[int, int]]:
@@ -139,12 +156,22 @@ class Detector:
         return self
 
     def model_mask(self, readings: np.ndarray, start: int = 0) -> np.ndarray:
-        """Per-hour boolean anomaly flag from the learned model (all-False if none)."""
+        """Per-hour boolean anomaly flag from the learned model (all-False if none).
+
+        The logistic layer flags an hour only when its anomaly probability is at
+        least ``model_min_proba``. This confidence gate is deliberate: the model is
+        a *supplement* to the high-precision rules, so it should add only the
+        anomalies it is sure about — an ungated 0.5 cut-off floods false positives
+        and wrecks the combined precision (see ``config.model_min_proba``). The
+        isolation forest has no calibrated probability, so it uses its own
+        contamination-based decision (``predict == -1`` marks an outlier).
+        """
         if self._model is None:
             return np.zeros(np.asarray(readings).shape[0], dtype=bool)
         bundle = compute_features(readings, start=start, window=self.settings.rolling_window)
         if self._kind == "logistic":
-            return self._model.predict(bundle.matrix) == 1
+            proba = self._model.predict_proba(bundle.matrix)[:, 1]
+            return proba >= self.settings.model_min_proba
         return self._model.predict(bundle.matrix) == -1  # isolation_forest: -1 = outlier
 
     # -- deterministic rules ---------------------------------------------------
@@ -169,11 +196,24 @@ class Detector:
                 seg = types[a : b + 1]
                 seg[seg == NORMAL] = OUTAGE
 
-        # 3) Theft: sustained drop below a fraction of the baseline.
-        below = (bundle.readings < s.theft_fraction * bundle.expected) & (bundle.expected > tol)
-        below &= types == NORMAL
+        # 3) Theft: a sustained drop below a fraction of the baseline WHOSE SHAPE
+        # is still the house's daily profile. A meter under-recording an occupied
+        # house scales the profile (readings stay correlated with the baseline); an
+        # empty-house vacation collapses to a flat standby level (correlation ~0),
+        # so the shape test is what tells the two apart.
+        #
+        # The drop is tested on a short rolling mean of the reading/baseline ratio,
+        # not hour by hour: theft is a sustained regime shift, and smoothing stops
+        # per-hour noise from fraying the run (a 0.7x theft whose noisy hours stray
+        # above the threshold would otherwise be under-detected).
+        ratio = bundle.readings / np.maximum(bundle.expected, tol)
+        smooth = _rolling_mean(ratio, min(6, n))
+        below = (smooth < s.theft_fraction) & (bundle.expected > tol) & (types == NORMAL)
         for a, b in _runs_of(below):
-            if (b - a + 1) >= s.theft_min_run:
+            if (b - a + 1) < s.theft_min_run:
+                continue
+            corr = window_shape_corr(bundle.readings[a : b + 1], bundle.expected[a : b + 1])
+            if corr >= s.theft_shape_corr_min:
                 types[a : b + 1] = THEFT
 
         # 4) Spike: robust-z far above the baseline AND a materially large jump

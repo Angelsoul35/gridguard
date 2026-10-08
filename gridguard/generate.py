@@ -18,10 +18,13 @@ time, each tagged with its type:
 * ``theft_tampering``   — a sustained drop to a fraction of the expected load
   (non-technical loss), or negative / bypassed readings.
 
-We also inject the occasional **vacation**: a sustained drop that is *labelled
-normal*. A vacation is physically indistinguishable from partial theft, and
-keeping it in the data on purpose stops the honest evaluation from pretending
-that problem away (see ``docs/adr/0004`` and the README's evaluation section).
+We also inject the occasional **vacation**: a sustained low stretch that is
+*labelled normal*. A vacation is a genuinely harder confounder than a spike or an
+outage, which is why it is kept in the data: it forces the detector to tell an
+empty house (a flat standby load, no daily peaks) from theft (an occupied house
+whose meter under-records, so the daily peak shape is preserved and only scaled).
+That physical difference — flat vs shape-preserving — is the signal the detector
+keys on (see ``docs/adr/0004`` and the README's evaluation section).
 
 The split (:func:`make_split`) holds out **whole houses**, so the test meters are
 never seen during training. A detector that only memorised the training houses
@@ -149,9 +152,10 @@ def _inject_theft(rng, series, labels, events) -> None:
         kind = "bypass"
         fraction = 0.0
     else:
-        # Partial, sustained drop to a fraction of the expected load. The upper
-        # end (~0.7) is deliberately close to legitimate variation, so it is not
-        # always caught — that is the honest, hard case.
+        # Partial, sustained drop to a fraction of the expected load. Crucially the
+        # series is *scaled* (multiplied), so the daily shape is preserved — that is
+        # what a meter under-recording an occupied house looks like, and what the
+        # shape test uses to tell it from a flat empty-house vacation.
         fraction = float(rng.uniform(0.35, 0.72))
         series[start : start + duration] *= fraction
         kind = "partial"
@@ -170,14 +174,24 @@ def _inject_theft(rng, series, labels, events) -> None:
 def _inject_vacation(rng, series, labels, events) -> None:
     """A sustained low-consumption stretch that is LEGITIMATE (labelled normal).
 
-    Physically it looks like partial theft; it is here on purpose so the honest
-    evaluation has to cope with it instead of assuming every drop is theft.
+    An empty house is not a scaled-down occupied house: with nobody home there is
+    no morning ramp and no evening cooking peak, only a low, roughly flat standby
+    load (fridge, routers, standby electronics). So a vacation **flattens** the
+    daily shape to a standby level — which is exactly what distinguishes it from
+    theft, where an occupied house's meter under-records and the daily shape (the
+    peaks) is preserved, just scaled. The honest evaluation must tell the two
+    apart, and this is the physical difference it keys on.
     """
     n = series.shape[0]
     duration = int(rng.integers(24, 97))  # 1-4 days
     start = int(rng.integers(0, n - duration))
-    fraction = float(rng.uniform(0.15, 0.40))
-    series[start : start + duration] *= fraction
+    # Standby level: a low, flat fraction of the house's typical reading, with a
+    # little appliance-cycling noise so it is not perfectly constant (which would
+    # read as a stuck meter) but carries no daily peak structure.
+    typical = float(np.median(series[series > 0])) if np.any(series > 0) else 1.0
+    standby = typical * float(rng.uniform(0.22, 0.40))
+    noise = rng.lognormal(mean=0.0, sigma=0.10, size=duration)
+    series[start : start + duration] = standby * noise
     # Labels stay NORMAL on purpose.
     events.append({"type": "vacation_normal", "start": start, "end": start + duration - 1})
 

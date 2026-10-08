@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import numpy as np
+
 from gridguard.config import Settings
 from gridguard.detector import Detector
 from gridguard.generate import OUTAGE, SPIKE, THEFT, make_split
@@ -55,6 +57,30 @@ def test_detects_bypass_negative_readings(detector: Detector):
     assert _covers(findings, THEFT, 150, 189)
     theft = next(f for f in findings if f.anomaly_type == THEFT)
     assert "bypass" in theft.reason
+
+
+def test_vacation_flat_drop_is_not_flagged_as_theft(detector: Detector):
+    # A vacation flattens the load to a standby level: the house is empty, so the
+    # daily peak shape disappears. Theft, by contrast, scales the profile and keeps
+    # its shape. A flat drop must therefore NOT be flagged as theft even though it
+    # is just as deep and just as sustained — the shape test is what distinguishes
+    # the two, and this is the false positive the whole design exists to avoid.
+    x = clean_series(seed=8)
+    typical = float(np.median(x[x > 0]))
+    rng = np.random.default_rng(0)
+    x[200 : 200 + 96] = typical * 0.30 * rng.lognormal(0.0, 0.1, 96)  # flat, no peaks
+    findings = detector.detect(x)
+    assert not any(f.anomaly_type == THEFT for f in findings)
+
+
+def test_high_fraction_theft_still_detected(detector: Detector):
+    # A meter under-recording to 0.70 of the load (a subtle theft) still keeps the
+    # daily shape, so smoothing the ratio and the shape test catch it — this is the
+    # recall the per-hour threshold used to miss on noisy high-fraction drops.
+    x = clean_series(seed=9)
+    x[100 : 100 + 96] *= 0.70
+    findings = detector.detect(x)
+    assert _covers(findings, THEFT, 100, 195)
 
 
 def test_outage_shorter_than_min_run_is_ignored(detector: Detector):

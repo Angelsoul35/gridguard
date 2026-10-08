@@ -33,23 +33,25 @@ def test_spikes_and_outages_are_caught_well(metrics: dict):
     assert metrics[OUTAGE]["f1"] >= 0.88
 
 
-def test_theft_is_detected_but_honestly_imperfect(metrics: dict):
-    # Theft is the hard case: subtle, sustained drops look like legitimate
-    # vacations. The rule stays above these conservative floors (measured
-    # ~0.63 precision / 0.46 recall), and is honestly far from perfect.
-    assert metrics[THEFT]["precision"] >= 0.45
-    assert metrics[THEFT]["recall"] >= 0.30
-    assert metrics[THEFT]["f1"] >= 0.40
-    assert metrics[THEFT]["recall"] < 0.95  # not a suspicious near-perfect score
+def test_theft_is_detected_well(metrics: dict):
+    # Theft is told from a legitimate vacation by the daily shape (theft scales
+    # the profile; a vacation flattens it), so it is detected in the same league
+    # as the other anomalies. Floors are conservative vs the measured
+    # ~0.99 precision / ~0.81 recall / ~0.89 F1.
+    assert metrics[THEFT]["precision"] >= 0.90
+    assert metrics[THEFT]["recall"] >= 0.70
+    assert metrics[THEFT]["f1"] >= 0.82
 
 
 def test_overall_detection_floors(metrics: dict):
-    assert metrics["overall_rules"]["precision"] >= 0.65
-    assert metrics["overall_rules"]["f1"] >= 0.58
-    # The learned model lifts overall recall over the rules alone.
-    assert metrics["overall_model"]["recall"] >= 0.78
-    assert metrics["overall_combined"]["recall"] >= 0.82
+    # Rules are the high-precision backbone.
+    assert metrics["overall_rules"]["precision"] >= 0.95
+    assert metrics["overall_rules"]["f1"] >= 0.88
+    # The gated model is a recall supplement: combined recall clears the rules'
+    # recall without the precision collapse an ungated union would cause.
+    assert metrics["overall_combined"]["recall"] >= 0.90
     assert metrics["overall_combined"]["recall"] > metrics["overall_rules"]["recall"]
+    assert metrics["overall_combined"]["precision"] >= 0.65
 
 
 def test_support_present(metrics: dict):

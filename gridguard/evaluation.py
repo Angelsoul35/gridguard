@@ -139,8 +139,11 @@ def format_report(metrics: dict) -> str:
             f"anomalous hours (spike {sup[SPIKE]:.0f}, outage {sup[OUTAGE]:.0f}, "
             f"theft {sup[THEFT]:.0f})"
         ),
-        "note: synthetic data; theft is the hard case (subtle sustained drops look",
-        "      like legitimate vacations). Real deployment needs real AMI data + labels.",
+        "note: the rules are the high-precision backbone (rules only); the gated",
+        "      model adds recall (rules + model) as a precision/recall dial. Theft",
+        "      is told from a legitimate vacation by whether the daily shape is kept",
+        "      (theft scales it) or flattened (vacation). Synthetic data: a real",
+        "      deployment retrains and recalibrates on labelled AMI meter data.",
     ]
     return "\n".join(lines)
 

@@ -15,6 +15,7 @@ base del propio contador (`features.py`):
 | `zero_run`           | longitud de la racha de ceros que termina en esta hora (apagón)          |
 | `flat_run`           | longitud de la racha de valores constantes (contador pegado)             |
 | `night_day_ratio`    | relación consumo-noche / consumo-día en la ventana reciente              |
+| `shape_corr`         | correlación de la ventana con la forma diaria esperada: ~1 si conserva el perfil (normal o robo escalado), ~0 si se ha aplanado (vacación o contador pegado) — lo que separa robo de vacación |
 | `roll_mean`          | media móvil de la ventana (normalizada)                                  |
 | `roll_std`           | desviación móvil (un plano la hunde; un pico la dispara)                 |
 

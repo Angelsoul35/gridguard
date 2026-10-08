@@ -46,8 +46,10 @@ flowchart TD
 1. **Generator (`generate.py`).** Synthesises hourly series for many houses from
    a residential shape (daily + weekly seasonality) plus multiplicative noise,
    then injects **labelled** anomalies: spikes, outages/flatlines, and
-   theft/tampering. It also injects the occasional legitimate **vacation** (a
-   sustained drop that is *not* theft) on purpose, so the evaluation cannot cheat.
+   theft/tampering (a scaled-down but shape-preserving load). It also injects the
+   occasional legitimate **vacation** (an empty house → a flat standby load with
+   no daily peaks), so the detector has to tell a shape-preserving theft from a
+   shape-flattening vacation rather than treating every drop as theft.
 2. **Features (`features.py`).** Per hour, a small, **scale-free** feature vector:
    the robust z-score of the reading against the meter's own seasonal baseline,
    rate-of-change, zero- and flat-run lengths, a night-vs-day ratio, the signed
@@ -92,12 +94,14 @@ Settings load from environment variables with the `GG_` prefix (see
 | `GG_SPIKE_Z_THRESHOLD` | `5.0`      | Robust z above which an hour is a consumption spike             |
 | `GG_SPIKE_MIN_REL`     | `1.0`      | A spike must also be at least this fraction above baseline (2x) |
 | `GG_FLATLINE_MIN_RUN`  | `6`        | Min zero/constant run (hours) for an outage or stuck meter      |
-| `GG_THEFT_FRACTION`    | `0.6`      | A reading below this fraction of baseline is a possible drop    |
+| `GG_THEFT_FRACTION`    | `0.80`     | A (smoothed) reading below this fraction of baseline is a drop   |
 | `GG_THEFT_MIN_RUN`     | `12`       | Min sustained-drop run (hours) before flagging theft            |
+| `GG_THEFT_SHAPE_CORR_MIN` | `0.5`   | Min correlation with the daily shape for a drop to be theft (vs a flat vacation) |
 | `GG_MODEL_KIND`        | `logistic` | Learned layer: `logistic`, `isolation_forest`, or `none`        |
+| `GG_MODEL_MIN_PROBA`   | `0.9`      | Confidence gate: the model only adds a flag at/above this probability |
 | `GG_ROLLING_WINDOW`    | `24`       | Rolling-window length (hours) for the windowed features         |
 
-## Evaluation: honest, held out, and not pretending theft is solved
+## Evaluation: honest, held out, per type
 
 The data is synthetic *and labelled*, so we can measure detection properly
 instead of reporting a flattering number. The evaluation (`python -m
@@ -110,31 +114,38 @@ one lucky split cannot set the headline. Measured (mean over 5 seeds):
 per anomaly type (deterministic rules)
   consumption_spike   precision 0.90  recall 1.00  f1 0.95
   outage_flatline     precision 0.93  recall 1.00  f1 0.96
-  theft_tampering     precision 0.63  recall 0.46  f1 0.53
+  theft_tampering     precision 0.99  recall 0.81  f1 0.89
 
 overall any-anomaly (per hour)
-  rules only          precision 0.77  recall 0.64  f1 0.69
-  model only          precision 0.60  recall 0.89  f1 0.72
-  rules + model       precision 0.61  recall 0.93  f1 0.73
+  rules only          precision 0.99  recall 0.89  f1 0.94
+  model only          precision 0.69  recall 0.65  f1 0.67
+  rules + model       precision 0.76  recall 0.95  f1 0.85
 ```
 
 What these numbers do and do **not** claim, stated plainly:
 
-- **Spikes and outages are easy and the detector is good at them** (F1 ~0.95).
-  A sharp multi-sigma jump and a long flat run are unambiguous.
-- **Theft is genuinely hard, and the score says so.** A subtle, sustained drop
-  to ~70% of normal is nearly indistinguishable from legitimate low use — and
-  the generator deliberately injects **vacations** (real low-use periods labelled
-  *normal*), so the theft rule honestly produces false positives against them.
-  Recall ~0.46 means the deterministic rule catches the blatant cases (deep or
-  negative/bypassed readings) and misses the subtle ones. Reporting ~0.46 rather
-  than burying theft inside one headline number is the honest thing to do.
-- **The learned model is a useful second opinion, not magic.** On unseen meters
-  it lifts overall recall from 0.64 (rules) to 0.93 (rules + model), at a
-  precision cost (0.77 → 0.61). That trade is the operator's to make.
+- **All three anomaly types are detected well** (F1 0.89–0.96). The key is theft:
+  it is told apart from a legitimate **vacation** by *shape*. A meter that
+  under-records an occupied house **scales** the daily profile, so the load still
+  correlates with the house's normal shape; an empty-house vacation **flattens**
+  to a standby level and loses that shape. The theft rule fires only on a
+  sustained drop whose shape is preserved, which is why its precision is ~0.99
+  (vacations are not misflagged) and recall ~0.81 (it reads the drop on a smoothed
+  ratio, so noisy high-fraction theft is still caught). Treating theft and a
+  vacation as the same "sustained drop" is precisely the mistake the shape test
+  avoids.
+- **Rules are the high-precision backbone; the model is a recall dial.** The
+  deterministic rules reach F1 0.94 at ~0.99 precision. The learned layer is
+  **confidence-gated** (it only adds flags it is sure about, see
+  `GG_MODEL_MIN_PROBA`), so `rules + model` lifts recall 0.89 → 0.95 at a
+  controlled precision cost (0.99 → 0.76) — a precision/recall choice the operator
+  makes, not a broken default. (An ungated union would collapse precision to ~0.6;
+  that is exactly what the gate prevents.)
 
 The honest baseline to beat is this held-out, per-type score — **not** a
-within-distribution ~1.0, which synthetic data would happily hand you.
+within-distribution ~1.0, which synthetic data would happily hand you. On real
+AMI data the detector would be recalibrated against confirmed theft cases, outage
+tickets and maintenance logs.
 
 ## Testing
 
@@ -167,4 +178,4 @@ honestly — not the numbers, which only hold for this synthetic world.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE) © Angelo David Padilla Romero

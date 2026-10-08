@@ -26,6 +26,12 @@ Features
                        in the trailing window. Legitimate load has a stable
                        night/day balance; a bypass that only taps part of the
                        load can distort it.
+``shape_corr``         trailing-window Pearson correlation between the readings and
+                       the house's expected daily shape. Near 1 when the load still
+                       follows its normal profile (normal, or theft that merely
+                       scales it); near 0 when the shape has collapsed to a flat
+                       level (an empty-house vacation, or a stuck meter). This is
+                       what separates theft from a legitimate vacation.
 ``roll_mean``          trailing-window mean, normalised by the median level.
 ``roll_std``           trailing-window standard deviation, normalised by the
                        median level. A flatline collapses it; a spike inflates it.
@@ -57,9 +63,27 @@ FEATURE_NAMES = [
     "zero_run",
     "flat_run",
     "night_day_ratio",
+    "shape_corr",
     "roll_mean",
     "roll_std",
 ]
+
+
+def window_shape_corr(readings: np.ndarray, expected: np.ndarray) -> float:
+    """Pearson correlation between a window's readings and its expected shape.
+
+    Returns 0.0 when either side has no variation (a flat window), which is the
+    correct "no shape" answer rather than an undefined one.
+    """
+    x = np.asarray(readings, dtype=float)
+    e = np.asarray(expected, dtype=float)
+    if x.shape[0] < 2:
+        return 0.0
+    xs, es = x - x.mean(), e - e.mean()
+    denom = float(np.sqrt((xs**2).sum() * (es**2).sum()))
+    if denom <= 1e-12:
+        return 0.0
+    return float(np.clip((xs * es).sum() / denom, -1.0, 1.0))
 
 
 def robust_z(values: np.ndarray) -> np.ndarray:
@@ -175,6 +199,18 @@ def compute_features(readings: np.ndarray, start: int = 0, window: int = 24) -> 
     roll_var = np.maximum(roll_sqsum / counts - roll_mean**2, 0.0)
     roll_std = np.sqrt(roll_var)
 
+    # Trailing-window correlation between readings and the expected daily shape.
+    exp_sum = _trailing_sum(expected, window)
+    exp_sqsum = _trailing_sum(expected**2, window)
+    xe_sum = _trailing_sum(readings * expected, window)
+    exp_mean = exp_sum / counts
+    cov = xe_sum / counts - roll_mean * exp_mean
+    var_x = np.maximum(roll_sqsum / counts - roll_mean**2, 0.0)
+    var_e = np.maximum(exp_sqsum / counts - exp_mean**2, 0.0)
+    denom = np.sqrt(var_x * var_e)
+    shape_corr = np.where(denom > 1e-12 * median_x**2, cov / np.where(denom > 0, denom, 1.0), 0.0)
+    shape_corr = np.clip(shape_corr, -1.0, 1.0)
+
     matrix = np.column_stack(
         [
             readings / median_x,
@@ -184,6 +220,7 @@ def compute_features(readings: np.ndarray, start: int = 0, window: int = 24) -> 
             zero_run,
             flat_run,
             night_day_ratio,
+            shape_corr,
             roll_mean / median_x,
             roll_std / median_x,
         ]

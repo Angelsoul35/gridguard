@@ -55,14 +55,25 @@ def demo() -> None:
     outage[7 * 24 : 7 * 24 + 18] = 0.0
     _print_house(svc, "outage", outage, "injected an 18-hour zero outage from hour 168")
 
-    # 4) Theft / non-technical loss: consumption held at ~40% for four days.
+    # 4) Theft / non-technical loss: an occupied house whose meter under-records,
+    # so the daily shape is kept and only scaled to ~40% for four days.
     theft = _clean_house(rng)
     theft[5 * 24 : 5 * 24 + 96] *= 0.40
-    _print_house(svc, "theft", theft, "injected a 96-hour drop to ~40% from hour 120")
+    _print_house(svc, "theft", theft, "meter under-records to ~40% for 96h (shape kept)")
+
+    # 5) Vacation: an EMPTY house for four days — a flat standby load with no daily
+    # peaks. It is just as deep and sustained as the theft, but it is NOT theft, and
+    # the shape test must leave it unflagged. This is the false positive the whole
+    # design exists to avoid.
+    vacation = _clean_house(rng)
+    typical = float(np.median(vacation))
+    vacation[5 * 24 : 5 * 24 + 96] = typical * 0.30 * rng.lognormal(0.0, 0.1, 96)
+    _print_house(svc, "vacation", vacation, "empty house, flat standby for 96h (NOT theft)")
 
     print("\nEvery flag above names the rule, the value, the baseline and a score.")
-    print("A clean meter stays clean; the honest held-out metrics are in")
-    print("`python -m gridguard.evaluation` (theft is the hard case).")
+    print("A clean meter stays clean, the theft is caught, and the vacation — just as")
+    print("deep but flat — is correctly NOT flagged as theft (the shape test at work).")
+    print("The honest held-out metrics are in `python -m gridguard.evaluation`.")
 
 
 def main() -> int:

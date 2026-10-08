@@ -41,8 +41,9 @@ flowchart TD
   of perfectly constant readings (a stuck meter). Real consumption is never
   exactly flat for hours, so a long flat run is the signal.
 - **Theft / non-technical loss** — readings held below a fraction of the expected
-  load for a sustained stretch, or negative / near-zero "bypassed" readings. This
-  is the hard case; see the evaluation note below.
+  load for a sustained stretch **while the daily shape is preserved** (an occupied
+  house whose meter under-records scales the profile; an empty-house vacation
+  flattens it and is not theft), or negative / near-zero "bypassed" readings.
 
 The rules are applied in priority order per hour, so each hour gets at most one
 type: negative/bypass first, then outage/flatline, then sustained drop, then
@@ -81,6 +82,7 @@ a meaningless near-perfect accuracy. Instead the evaluation:
   hard, and one blended number would hide that, and
 - **averages over seeds**, so a lucky split cannot set the headline.
 
-The result is honest: spikes and outages score ~0.95 F1, theft scores ~0.53, and
-the learned model trades precision for recall overall. A production system would
+The result is honest: spikes ~0.95 F1, outages ~0.96, and theft ~0.89 (precision
+~0.99) once theft is separated from a legitimate vacation by shape. The gated
+learned model is a recall dial on top of the rules. A production system would
 re-run this against real AMI data and real labels.
