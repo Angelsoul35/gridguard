@@ -19,7 +19,7 @@ the rule, the offending value, the house's own baseline, and a score:
 
 On top of the rules an **optional** scikit-learn model (``logistic`` by default,
 or ``isolation_forest``, or ``none``) scores each hour from the full feature
-vector. It is trained on some houses and applied to unseen ones; the honest
+vector. It is trained on some houses and applied to unseen ones; the leakage-free
 evaluation reports what it adds over the rules, and what it costs in precision.
 The model is a second opinion for *overall* anomaly recall — the rules remain the
 source of the typed, explainable findings.

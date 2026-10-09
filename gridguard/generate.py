@@ -1,4 +1,4 @@
-"""Synthetic, labelled smart-meter series for honest, offline evaluation.
+"""Synthetic, labelled smart-meter series for leakage-free, offline evaluation.
 
 Everything here is synthetic — no real meter data is involved, and nothing is
 downloaded. Each house is an hourly electricity-consumption series built from a
@@ -179,7 +179,7 @@ def _inject_vacation(rng, series, labels, events) -> None:
     load (fridge, routers, standby electronics). So a vacation **flattens** the
     daily shape to a standby level — which is exactly what distinguishes it from
     theft, where an occupied house's meter under-records and the daily shape (the
-    peaks) is preserved, just scaled. The honest evaluation must tell the two
+    peaks) is preserved, just scaled. The leakage-free evaluation must tell the two
     apart, and this is the physical difference it keys on.
     """
     n = series.shape[0]
@@ -245,7 +245,7 @@ def make_split(
     """Split whole houses into train/test so the test meters are never seen.
 
     Holding out *whole series* (not random hours) is what makes the evaluation
-    honest: the detector is judged on meters whose individual habits, base scale
+    without leakage: the detector is judged on meters whose individual habits, base scale
     and noise it has never observed.
     """
     houses = make_dataset(n_houses, seed=seed, n_days=n_days, anomaly_prob=anomaly_prob)

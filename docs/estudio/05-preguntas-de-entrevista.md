@@ -56,5 +56,5 @@ pequeña se ve igual.
 Ingerir datos AMI reales, entrenar y ajustar umbrales con **etiquetas reales**
 (robos confirmados, partes de corte, mantenimiento), manejar huecos y cambios de
 hora/DST, añadir persistencia y usuarios, vigilar el **drift** y reevaluar con la
-misma forma de evaluación honesta. Y seguramente añadir una regla de "consumo alto
+misma forma de evaluación sin fuga. Y seguramente añadir una regla de "consumo alto
 sostenido", que hoy es una zona gris que el pico solo cubre a medias.

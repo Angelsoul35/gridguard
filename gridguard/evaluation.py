@@ -1,7 +1,7 @@
-"""Honest, held-out evaluation of the detector on unseen meters.
+"""Leakage-free, held-out evaluation of the detector on unseen meters.
 
-The data is synthetic and labelled, so we can measure what matters and refuse to
-flatter ourselves:
+The data is synthetic and labelled, so we can measure what matters without
+flattering ourselves:
 
 * **Held out by whole house.** Test meters are never seen in training
   (:func:`gridguard.generate.make_split`), so a model that memorised training
@@ -17,7 +17,7 @@ flatter ourselves:
 
 What the numbers do **not** claim: this is synthetic data with known labels. A
 production system needs real AMI meter data, real labels (confirmed theft cases,
-outage tickets), and a drift-aware re-evaluation. The honest baseline to beat is
+outage tickets), and a drift-aware re-evaluation. The leakage-free baseline is
 the held-out score here, not a within-distribution ~1.0.
 """
 
@@ -41,8 +41,8 @@ def _prf(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
     return precision, recall, f1
 
 
-def _evaluate_seed(seed: int, settings: Settings) -> dict:
-    data = make_split(seed=seed)
+def _evaluate_seed(seed: int, settings: Settings, split_fn=make_split) -> dict:
+    data = split_fn(seed=seed)
     detector = Detector(settings).fit(data.train)
 
     keys = [*ANOMALY_TYPES, "overall_rules", "overall_model", "overall_combined"]
@@ -79,11 +79,17 @@ def _evaluate_seed(seed: int, settings: Settings) -> dict:
 
 
 def aggregate_metrics(
-    seeds: range | list[int] = range(5), settings: Settings | None = None
+    seeds: range | list[int] = range(5),
+    settings: Settings | None = None,
+    split_fn=make_split,
 ) -> dict:
-    """Average per-seed precision/recall/F1 (mean and std) over several splits."""
+    """Average per-seed precision/recall/F1 (mean and std) over several splits.
+
+    ``split_fn`` selects the data: the default synthetic ``make_split``, or
+    ``gridguard.real_data.make_real_split`` to evaluate on real consumption series.
+    """
     settings = settings or get_settings()
-    per_seed = [_evaluate_seed(s, settings) for s in seeds]
+    per_seed = [_evaluate_seed(s, settings, split_fn) for s in seeds]
     keys = [*ANOMALY_TYPES, "overall_rules", "overall_model", "overall_combined"]
     out: dict = {}
     for k in keys:
@@ -112,8 +118,7 @@ def aggregate_metrics(
 
 def _row(label: str, m: dict) -> str:
     return (
-        f"  {label:<22} precision {m['precision']:.2f}  "
-        f"recall {m['recall']:.2f}  f1 {m['f1']:.2f}"
+        f"  {label:<22} precision {m['precision']:.2f}  recall {m['recall']:.2f}  f1 {m['f1']:.2f}"
     )
 
 
@@ -121,7 +126,7 @@ def format_report(metrics: dict) -> str:
     n = metrics["n_seeds"]
     sup = metrics["support"]
     lines = [
-        f"GridGuard honest evaluation - held-out meters, mean over {n} seeds",
+        f"GridGuard leakage-free evaluation - held-out meters, mean over {n} seeds",
         "(point-wise hourly scoring; test houses never seen in training)",
         "",
         "per anomaly type (deterministic rules)",

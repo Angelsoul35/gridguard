@@ -36,4 +36,4 @@ sure about, turning `rules + model` into a genuine recall dial (recall 0.89 →
   costs (precision), leaving the precision/recall choice to the operator.
 - A genuinely novel anomaly shape the rules do not encode can still be surfaced
   by the model's overall flag, even though it will not receive a specific type —
-  an honest signpost that a new rule may be needed.
+  a leakage-free signpost that a new rule may be needed.

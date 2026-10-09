@@ -68,4 +68,4 @@ def test_format_report_mentions_each_type(metrics: dict):
 
 def test_aggregate_eval_smoke():
     text = aggregate_eval(range(2))
-    assert "GridGuard honest evaluation" in text
+    assert "GridGuard leakage-free evaluation" in text

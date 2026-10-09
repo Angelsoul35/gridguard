@@ -4,7 +4,7 @@
 Accepted.
 
 ## Context
-The data is synthetic, so it would be trivial — and dishonest — to report a
+The data is synthetic, so it would be trivial — and disrigorous — to report a
 near-perfect score. A random train/test split shares meters between train and
 test, a single blended accuracy hides that one anomaly type is far harder than
 the others, and a single seed can land on a lucky split. Any of these would make
@@ -36,7 +36,7 @@ data precisely so the evaluation proves that separation holds on unseen meters.
 - The reported numbers are believable and reproducible; theft is detected in the
   same league as the other types (not hidden, and not faked), because the theft
   vs vacation confound is addressed by a real signal rather than a disclaimer.
-- The honest baseline to beat is this held-out, per-type score — not a
+- The leakage-free baseline is this held-out, per-type score — not a
   within-distribution ~1.0.
 - A production system would re-run the same evaluation shape against real AMI
   data and real labels, and extend the shape/behaviour features for the messier

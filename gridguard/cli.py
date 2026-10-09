@@ -73,7 +73,7 @@ def demo() -> None:
     print("\nEvery flag above names the rule, the value, the baseline and a score.")
     print("A clean meter stays clean, the theft is caught, and the vacation — just as")
     print("deep but flat — is correctly NOT flagged as theft (the shape test at work).")
-    print("The honest held-out metrics are in `python -m gridguard.evaluation`.")
+    print("The leakage-free held-out metrics are in `python -m gridguard.evaluation`.")
 
 
 def main() -> int:

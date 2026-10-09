@@ -16,7 +16,7 @@ cada decisión.
 3. [03 — Las reglas y el modelo opcional](03-reglas-y-modelo.md)
    Las tres reglas deterministas (pico, apagón/plano, robo) y el modelo como
    segunda opinión.
-4. [04 — Evaluación honesta](04-evaluacion-honesta.md)
+4. [04 — Evaluación sin fuga](04-evaluacion-rigurosa.md)
    Por qué se evalúa con contadores no vistos, por tipo, hora a hora, y por qué el
    robo es el caso difícil.
 5. [05 — Preguntas de entrevista](05-preguntas-de-entrevista.md)
@@ -27,5 +27,5 @@ cada decisión.
 Detección de anomalías en series de contadores inteligentes **determinista y
 explicable** (picos de consumo, apagones y contadores "pegados", y pérdida no
 técnica / robo de electricidad), donde cada alerta dice **por qué** ha saltado, y
-que se mide con **honestidad** sobre contadores nunca vistos — sin fingir un
+que se mide con **rigor** sobre contadores nunca vistos — sin fingir un
 resultado perfecto.

@@ -66,7 +66,7 @@ no un tipo.
   deja esa elección precisión/recall al operador (ver ADR 0002).
 - Una anomalía con una forma nueva que las reglas no codifican puede aun así
   aparecer en la bandera global del modelo, aunque sin tipo concreto: una señal
-  honesta de que quizá hace falta una regla nueva.
+  rigurosa de que quizá hace falta una regla nueva.
 
 ## Severidad
 

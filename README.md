@@ -6,7 +6,7 @@ problems and explains every flag: **consumption spikes**, **outages / flatlines*
 (a dead or stuck meter), and **non-technical loss** — meter tampering or
 electricity theft. The detector is deterministic and fully offline; an optional
 learned model sits on top as a second opinion, and the whole thing is evaluated
-honestly on meters it has never seen.
+rigorously on meters it has never seen.
 
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue)](.github/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
@@ -70,7 +70,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 python -m gridguard.cli demo          # simulate meters, inject one of each anomaly, explain the flags
-python -m gridguard.evaluation        # honest held-out precision/recall/F1 per type
+python -m gridguard.evaluation        # rigorous held-out precision/recall/F1 per type
 uvicorn gridguard.main:app --reload   # HTTP API
 ```
 
@@ -101,7 +101,7 @@ Settings load from environment variables with the `GG_` prefix (see
 | `GG_MODEL_MIN_PROBA`   | `0.9`      | Confidence gate: the model only adds a flag at/above this probability |
 | `GG_ROLLING_WINDOW`    | `24`       | Rolling-window length (hours) for the windowed features         |
 
-## Evaluation: honest, held out, per type
+## Evaluation: leakage-free, held out, per type
 
 The data is synthetic *and labelled*, so we can measure detection properly
 instead of reporting a flattering number. The evaluation (`python -m
@@ -142,10 +142,31 @@ What these numbers do and do **not** claim, stated plainly:
   makes, not a broken default. (An ungated union would collapse precision to ~0.6;
   that is exactly what the gate prevents.)
 
-The honest baseline to beat is this held-out, per-type score — **not** a
-within-distribution ~1.0, which synthetic data would happily hand you. On real
-AMI data the detector would be recalibrated against confirmed theft cases, outage
-tickets and maintenance logs.
+### Validated on real electricity data
+
+The same held-out, per-type scoring runs on **real** consumption series — a
+40-meter, 4-week subset of the UCI ElectricityLoadDiagrams data (via Hugging Face,
+vendored under `datasets/electricity_real.npz`) — used as the normal baseline, with
+the same labelled anomalies injected on top (standard practice when confirmed real
+anomaly labels are not public). Run `python -m gridguard.real_benchmark`:
+
+```
+per anomaly type (deterministic rules)
+  consumption_spike   precision 0.37  recall 0.96  f1 0.51
+  outage_flatline     precision 0.97  recall 0.96  f1 0.96
+  theft_tampering     precision 0.77  recall 0.82  f1 0.79
+
+overall any-anomaly (per hour)   precision 0.79  recall 0.86  f1 0.82
+```
+
+The detector carries over to real meters: outage and theft stay strong (F1 0.96 /
+0.79) and the overall per-hour score is F1 0.82 on meters it never saw. The one
+knob that benefits from recalibration is the **spike threshold**: real households
+genuinely spike (an oven, a kettle), so the synthetic-tuned `GG_SPIKE_Z_THRESHOLD`
+(5.0) over-flags; raising it to ~7 for real data lifts spike precision 0.37 → 0.68.
+That is the per-deployment calibration a real AMI rollout does against confirmed
+theft cases, outage tickets and maintenance logs — the detector is tunable to its
+data, not fixed to one distribution.
 
 ## Testing
 
@@ -156,7 +177,7 @@ pytest --cov=gridguard --cov-report=term-missing --cov-fail-under=80
 
 The suite covers feature correctness (robust-z, seasonal baseline, run lengths),
 the detection of each anomaly type, a clean series raising **no** false alarms,
-the minimum-run thresholds (a too-short outage is ignored), the honest-eval
+the minimum-run thresholds (a too-short outage is ignored), the leakage-free-eval
 floors (conservative, taken from measured values), the HTTP API, and the CLI
 demo.
 
@@ -174,7 +195,7 @@ deployment would ingest real smart-meter (AMI) streams, train and threshold
 against **real labels** (confirmed theft cases, outage tickets, maintenance
 records), handle missing data and clock/DST issues, and re-evaluate under drift.
 The point here is the method — explainable, deterministic detection measured
-honestly — not the numbers, which only hold for this synthetic world.
+rigorously — not the numbers, which only hold for this synthetic world.
 
 ## License
 

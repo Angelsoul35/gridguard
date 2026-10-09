@@ -1,7 +1,7 @@
 # Architecture
 
 GridGuard is a small pipeline: a synthetic data generator, a feature layer, a
-detector (deterministic rules plus an optional learned model), an honest
+detector (deterministic rules plus an optional learned model), a leakage-free
 evaluation, and thin service/CLI/API surfaces. Everything is offline and
 deterministic.
 
@@ -82,7 +82,7 @@ a meaningless near-perfect accuracy. Instead the evaluation:
   hard, and one blended number would hide that, and
 - **averages over seeds**, so a lucky split cannot set the headline.
 
-The result is honest: spikes ~0.95 F1, outages ~0.96, and theft ~0.89 (precision
+The result is strong and leakage-free: spikes ~0.95 F1, outages ~0.96, and theft ~0.89 (precision
 ~0.99) once theft is separated from a legitimate vacation by shape. The gated
 learned model is a recall dial on top of the rules. A production system would
 re-run this against real AMI data and real labels.
