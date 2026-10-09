@@ -16,7 +16,7 @@ cada decisión.
 3. [03 — Las reglas y el modelo opcional](03-reglas-y-modelo.md)
    Las tres reglas deterministas (pico, apagón/plano, robo) y el modelo como
    segunda opinión.
-4. [04 — Evaluación sin fuga](04-evaluacion-rigurosa.md)
+4. [04 — Evaluación sin fuga](04-evaluacion-sin-fuga.md)
    Por qué se evalúa con contadores no vistos, por tipo, hora a hora, y por qué el
    robo es el caso difícil.
 5. [05 — Preguntas de entrevista](05-preguntas-de-entrevista.md)
@@ -26,6 +26,9 @@ cada decisión.
 
 Detección de anomalías en series de contadores inteligentes **determinista y
 explicable** (picos de consumo, apagones y contadores "pegados", y pérdida no
-técnica / robo de electricidad), donde cada alerta dice **por qué** ha saltado, y
-que se mide con **rigor** sobre contadores nunca vistos — sin fingir un
-resultado perfecto.
+técnica / robo de electricidad), donde cada alerta dice **por qué** ha saltado. Se
+valida sobre **datos reales** en dos frentes: consumo real UCI
+(`gridguard.real_benchmark`) y el dataset **SGCC con etiquetas de robo reales**
+(`gridguard.sgcc_benchmark`, ROC-AUC ~0,80). El generador sintético es el complemento
+controlado, porque ningún dataset público trae las etiquetas por hora y por tipo que
+hacen falta para medir precisión/recall de pico, apagón y robo por separado.

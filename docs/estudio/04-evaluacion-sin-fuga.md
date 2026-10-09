@@ -101,3 +101,29 @@ enseña dos cosas de nivel senior:
    pico 0,37 → 0,68. Es la calibración que un despliegue AMI hace contra casos de
    robo confirmados y partes de corte. El detector es **ajustable a su dato**, no
    fijo a una distribución.
+
+## Datos reales CON etiquetas reales: SGCC
+
+El benchmark más fuerte **no inyecta nada**. Usa el dataset **SGCC** (State Grid
+Corporation of China), donde cada cliente trae un **FLAG de robo confirmado**. Sobre
+un subconjunto balanceado de 500 clientes (vendoreado), características de consumo
+alimentan un random forest. Con `python -m gridguard.sgcc_benchmark`:
+
+```
+modelo                 CV ROC-AUC         train   test   gap
+Random forest          0.803 ± 0.007      0.999   0.804  0.194
+Logística (baseline)   0.592 ± 0.037      0.649   0.533  0.115
+```
+
+Detecta robo sobre **etiquetas reales** a **ROC-AUC ~0,80**. Punto fino de nivel
+senior: el random forest **ajusta sus filas de entrenamiento por diseño** (train AUC
+~1,0), así que la brecha train-test **no** es la señal de generalización aquí; lo es
+que la AUC **validada en CV** (0,803) coincida con la AUC **held-out** (0,804). La
+logística, mucho más floja (~0,59), es la evidencia de que el robo real es un patrón
+**no lineal** — por eso se usa el bosque.
+
+> **Por qué entonces el generador sintético.** Porque ningún dataset público trae
+> etiquetas **por hora y por tipo** (qué hora exacta fue pico, apagón o robo). El
+> sintético las da, y es lo que permite medir precisión/recall **por tipo** por
+> separado. Los tres niveles —sintético por hora, consumo real UCI, y SGCC con
+> etiquetas reales— se complementan: controlado, realista, y real-etiquetado.

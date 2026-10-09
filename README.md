@@ -4,9 +4,13 @@ Offline, explainable anomaly detection for smart-meter / grid time series. Given
 a house's hourly electricity readings, GridGuard flags three operational
 problems and explains every flag: **consumption spikes**, **outages / flatlines**
 (a dead or stuck meter), and **non-technical loss** — meter tampering or
-electricity theft. The detector is deterministic and fully offline; an optional
-learned model sits on top as a second opinion, and the whole thing is evaluated
-rigorously on meters it has never seen.
+electricity theft. The detector is deterministic and explainable, with an optional
+learned model on top as a second opinion. It is validated on **real** data on two
+fronts: real UCI electricity consumption (`gridguard.real_benchmark`) and the real
+**SGCC** theft dataset with **confirmed theft labels** (`gridguard.sgcc_benchmark`,
+ROC-AUC ~0.80). A labelled synthetic generator is kept as the controlled complement,
+because no public dataset provides the per-hour, per-type anomaly labels needed to
+measure spike / outage / theft precision and recall separately.
 
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue)](.github/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
@@ -144,11 +148,14 @@ What these numbers do and do **not** claim, stated plainly:
 
 ### Validated on real electricity data
 
-The same held-out, per-type scoring runs on **real** consumption series — a
-40-meter, 4-week subset of the UCI ElectricityLoadDiagrams data (via Hugging Face,
-vendored under `datasets/electricity_real.npz`) — used as the normal baseline, with
-the same labelled anomalies injected on top (standard practice when confirmed real
-anomaly labels are not public). Run `python -m gridguard.real_benchmark`:
+Two real-data benchmarks back up the synthetic evaluation.
+
+**1. Real consumption shapes (UCI).** The same held-out, per-type scoring runs on
+**real** consumption series — a 40-meter, 4-week subset of the UCI
+ElectricityLoadDiagrams data (via Hugging Face, vendored under
+`datasets/electricity_real.npz`) — used as the normal baseline, with the same
+labelled anomalies injected on top (standard practice when confirmed per-hour anomaly
+labels are not public). Run `python -m gridguard.real_benchmark`:
 
 ```
 per anomaly type (deterministic rules)
@@ -168,6 +175,24 @@ That is the per-deployment calibration a real AMI rollout does against confirmed
 theft cases, outage tickets and maintenance logs — the detector is tunable to its
 data, not fixed to one distribution.
 
+**2. Real theft with REAL labels (SGCC).** The strongest check injects nothing: it
+uses the **State Grid Corporation of China** dataset, where each customer's daily
+consumption carries a **confirmed theft flag**. On a balanced 500-customer subset
+(vendored under `datasets/sgcc_theft_real.npz`), consumption-statistic features drive
+a random forest. Run `python -m gridguard.sgcc_benchmark`:
+
+```
+model                  CV ROC-AUC         train    test     gap
+Random forest          0.803 +/- 0.007     0.999   0.804   0.194
+Logistic (baseline)    0.592 +/- 0.037     0.649   0.533   0.115
+```
+
+Theft is detected on real labelled data at **ROC-AUC ~0.80** (cross-validated, and
+the held-out AUC agrees — a random forest fits its training rows by design, so the
+CV/held-out agreement, not the train gap, is the generalisation signal). The far
+weaker logistic baseline (~0.59) is the evidence that real theft is a genuinely
+non-linear pattern, which is why the forest is used.
+
 ## Testing
 
 ```bash
@@ -178,8 +203,10 @@ pytest --cov=gridguard --cov-report=term-missing --cov-fail-under=80
 The suite covers feature correctness (robust-z, seasonal baseline, run lengths),
 the detection of each anomaly type, a clean series raising **no** false alarms,
 the minimum-run thresholds (a too-short outage is ignored), the leakage-free-eval
-floors (conservative, taken from measured values), the HTTP API, and the CLI
-demo.
+floors (conservative, taken from measured values), the **real-data benchmarks**
+(the UCI series are checked clean and the detector's real-data metrics have floors;
+the SGCC forest clears a real-theft ROC-AUC floor while a shuffled-label run
+collapses to chance), the HTTP API, and the CLI demo.
 
 ## Documentation
 
